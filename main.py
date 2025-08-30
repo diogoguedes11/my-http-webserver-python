@@ -2,6 +2,7 @@ import socket  # noqa: F401
 import threading
 import os
 import sys
+import gzip
 def handle_client(client_socket):
      success_response = 'HTTP/1.1 200 OK\r\n\r\n'
      notfound_response = 'HTTP/1.1 404 Not Found\r\n\r\n'
@@ -74,13 +75,38 @@ def handle_client(client_socket):
                client_socket.sendall(response.encode())
           elif path.startswith('/echo/'):
                content_body = path.split("/")[2]
-               response = (
-                    "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: text/plain\r\n"
-                    f"Content-Length: {len(content_body)}\r\n"
-                    "\r\n"
-                    f"{content_body}"
-               )
+               lines = data.decode().split("\r\n")
+               matched = False
+               for line in lines:
+                    if line.startswith("Accept-Encoding"):
+                         encoding_method =  line.split(":")[1].strip()
+                         matched = True
+                         break
+               if matched:
+                    compressed = gzip.compress(content_body.encode())
+                    if encoding_method == 'gzip':
+                         response = (
+                              "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: text/plain\r\n"
+                              "Content-Encoding: gzip\r\n"
+                              "\r\n"
+                              f"{compressed}"
+                         )
+                    else: 
+                         response = (
+                              "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: text/plain\r\n"
+                              "\r\n"
+                              f"{compressed}"
+                         )
+               else:
+                    response = (
+                         "HTTP/1.1 200 OK\r\n"
+                         "Content-Type: text/plain\r\n"
+                         f"Content-Length: {len(content_body)}\r\n"
+                         "\r\n"
+                         f"{content_body}"
+                    )
 
                client_socket.sendall(response.encode())
           else:
