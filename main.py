@@ -29,25 +29,47 @@ def handle_client(client_socket):
                client_socket.sendall(response.encode())
           elif path.startswith('/files/'):
                filename = path.split("/")[2]
-               if len(sys.argv) > 1:
-                    directory = sys.argv[2]
+          
+               directory = sys.argv[2]  if len(sys.argv) > 2 else ""
                filepath = f"{directory}{filename}"
-               print(filepath)
-               if os.path.exists(filepath):
-                    size = os.path.getsize(filepath)
-                    with open(filepath, "r") as f:
-                         contents = f.read()
-                    response = (
-                    "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: application/octet-stream\r\n"
-                    f"Content-Length: {size}\r\n"
-                    "\r\n"
-                    f"{contents}"
-                    )
-               else:
-                    response = (
-                         "HTTP/1.1 404 Not Found\r\n\r\n"
-                    )
+               lines = data.decode().split("\r\n")
+               for line in lines:
+                    body = line
+               file_existed_before = os.path.exists(filepath)
+               os.makedirs(os.path.dirname(filepath), exist_ok=True)
+               
+               if data_header[0] == "POST":
+                    with open(filepath, "w") as f:
+                         f.write(body)
+                    file_exists_now = os.path.exists(filepath)
+
+                    if file_existed_before and file_exists_now:
+                         with open(filepath,"r") as f:
+                              file_content = f.read()
+                         response = (
+                              "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: application/octet-stream\r\n"
+                              f"Content-Length: {len(file_content)}\r\n"
+                              "\r\n"
+                              f"{file_content}"
+                         )
+                    else: 
+                         response = (
+                              "HTTP/1.1 201 Created\r\n\r\n"
+                         )                  
+               else:  # GET request
+                    if os.path.exists(filepath):
+                         with open(filepath, "r") as f:
+                              file_content = f.read()
+                         response = (
+                              "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: application/octet-stream\r\n"
+                              f"Content-Length: {len(file_content)}\r\n"
+                              "\r\n"
+                              f"{file_content}"
+                         )
+                    else:
+                         response = "HTTP/1.1 404 Not Found\r\n\r\n"
 
                client_socket.sendall(response.encode())
           elif path.startswith('/echo/'):
